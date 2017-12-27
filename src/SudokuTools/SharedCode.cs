@@ -127,7 +127,7 @@ namespace SudokuTools
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine($"Epochs Completed: {stats.epochsCompleted}");
             Console.WriteLine($"Great Extinctions: {stats.extinctions}");
-            Console.WriteLine($"{stats.oldAgeKilled} organisms aged-out.");
+            Console.WriteLine($"{stats.diedOfOldAge} organisms aged-out.");
             Console.WriteLine($"{stats.culledCount} organisms culled.");
             
         }
@@ -165,7 +165,7 @@ namespace SudokuTools
            // Console.ForegroundColor = ConsoleColor.Yellow;
             System.Diagnostics.Debug.WriteLine($"Epochs Completed: {stats.epochsCompleted}");
             System.Diagnostics.Debug.WriteLine($"Great Extinctions: {stats.extinctions}");
-            System.Diagnostics.Debug.WriteLine($"{stats.oldAgeKilled} organisms aged-out.");
+            System.Diagnostics.Debug.WriteLine($"{stats.diedOfOldAge} organisms aged-out.");
             System.Diagnostics.Debug.WriteLine($"{stats.culledCount} organisms culled.");
 
         }
@@ -175,12 +175,24 @@ namespace SudokuTools
     {
         internal int extinctions;
         internal int randomWasTheBest;
-        internal int naturalMisselection;
+        /// <summary>
+        /// how many times a mutation happened that was detremental
+        /// </summary>
+        internal int mutationFailed;
+        /// <summary>
+        /// how many times a mutation or evolution was positive
+        /// </summary>
+        internal int evolutionWorked;
+        /// <summary>
+        /// how many times evolution or mutation became the new alpha
+        /// </summary>
         internal int bestMutationsEver;
-        internal int oldAgeKilled;
+        internal int diedOfOldAge;
         internal int epochsCompleted;
         internal int bestBabies;
         internal int culledCount;
+        internal int organismsBorn;
+        internal int matingPairs;
     }
 
 }

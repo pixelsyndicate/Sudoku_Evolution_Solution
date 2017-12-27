@@ -10,114 +10,265 @@ namespace SudokuTools
         private static Random _rnd = new Random();
         private static StringBuilder _sb = new StringBuilder();
         private static int[][] OriginalMatrix;
-        private EvolutionStats stats = new EvolutionStats { extinctions = 0, randomWasTheBest = 0, naturalMisselection=0, bestMutationsEver=0, oldAgeKilled=0, culledCount=0, bestBabies=0, epochsCompleted=0 };
+        private EvolutionStats stats = new EvolutionStats();
 
-        private List<Organism> Hive;
-        private OrganismBase TheBest;
+        //  private List<Organism> Hive;
+        //  private OrganismBase TheBest;
 
+        /// <summary>
+        /// Attempts find an optimal solution to a sudoku puzzle with the a hive of organisms
+        /// The organisms each have a total number of allowed Epochs (generations) to find the optimal solution. 
+        /// If after the max epochs is reached without an optimal solution, they are culled and another hive is started within the maximum number of specified extinctions
+        /// NOTE: Combinatorial evolution doesn't guarantee and optimal solution will be found.
+        /// </summary>
+        /// <param name="problem">int[][]</param>
+        /// <param name="numOrganisms">how many virtual organism are in the hive at a given time, each representing a possible solution</param>
+        /// <param name="maxEpochs">number of iterations (generations) each organism can run through to find the optimal solution</param>
+        /// <param name="maxExtinctions">if an optimal solution isn't found after the maxEpochs, all organisms are killed and the cycle is restarted if not more than maxExtinctions.</param>
+        /// <returns>The best solution (int[][]) found within the specified time.</returns>
         public async Task<int[][]> SolveWithinExtinctions(int[][] problem, int numOrganisms, int maxEpochs, int maxExtinctions)
         {
-
-            OriginalMatrix = DuplicateMatrix(problem);
+            stats.organismsBorn += numOrganisms;
+           OriginalMatrix = SudokuTool.DuplicateMatrix(problem);
             // wrapper for SolveEvo()
             var err = int.MaxValue;
             var seed = 0;
             int[][] bestSolution = null;
             var attempt = 0;
+            stats.extinctions = attempt;
+            // generate a new hive of organisms with a number of epochs to try for an error-free solution or until we've killed them off too often
             while (err != 0 && attempt < maxExtinctions)
             {
-                stats.extinctions = attempt;
                 _sb.AppendLine("\nseed = " + seed);
                 _rnd = new Random(seed);
-                bestSolution = await SolveAsync(problem, numOrganisms, maxEpochs).ConfigureAwait(true); // things, maxEpochs
+                bestSolution = await SolveAsync(problem, numOrganisms, maxEpochs).ConfigureAwait(true);
                 err = Errors(bestSolution);
                 ++seed;
                 ++attempt;
+                stats.extinctions++;
             }
 
+            // show some stats
+            System.Diagnostics.Debug.WriteLine(
+                $@"Stats | Epochs: {stats.epochsCompleted} | 
+Mass Extinctions: {stats.extinctions} | Organisms Created: {stats.organismsBorn} | 
+Died of Old Age: {stats.diedOfOldAge} | Random Was Best: {stats.randomWasTheBest} | 
+Mutation Fail: {stats.mutationFailed} | Evolution Worked: {stats.evolutionWorked} | 
+Best Mutation Ever: {stats.bestMutationsEver} | Worst Organisms Retired: {stats.culledCount} | 
+Mating Pairs: {stats.matingPairs} | Babies Were Best: {stats.bestBabies} ");
+
+            System.Diagnostics.Debug.WriteLine(
+               $@"Evolution that turned out for the best: {(double)(stats.bestMutationsEver/stats.evolutionWorked)*100 }%");
+
+            System.Diagnostics.Debug.WriteLine(
+               $@"Mating that resulted in KHAN: {stats.bestBabies / stats.matingPairs * 100}%");
             return bestSolution;
         }
 
-        private static int[][] DuplicateMatrix(int[][] matrix)
-        {
-            var result = CreateMatrix(Constants.BoardSize, Constants.BoardSize);
 
-            for (var i = 0; i < Constants.BoardSize; ++i)
-                for (var j = 0; j < Constants.BoardSize; ++j)
-                    result[i][j] = matrix[i][j];
-            return result;
-        }
-        private static int[][] CreateMatrix(int r, int c)
-        {
-            var result = new int[r][];
-            for (var row = 0; row < r; ++row)
-                result[row] = new int[c];
-            return (result);
-        }
 
         /// <summary>
-        /// returns the row/column coordinate of the top-left cell in the block identified
+        /// Core engine for finding a solution. Running this is going to spawn a hive of organisms (some percentage of workers, the rest explorers)
+        /// 
         /// </summary>
-        /// <param name="block">index of a 3x3 block</param>
-        /// <returns>returns the (row,column) coordinate of the top-left cell</returns>
-        public static int[] Corner(int block)
+        /// <param name="problem"></param>
+        /// <param name="numOrganisms"></param>
+        /// <param name="maxEpochs"></param>
+        /// <returns></returns>
+        private async Task<int[][]> SolveAsync(int[][] problem, int numOrganisms, int maxEpochs)
         {
-            int r = -1, c = -1;
+            // start fresh
+            var Hive = new List<Organism>(new Organism[numOrganisms]);
 
-            if (block == 0 || block == 1 || block == 2) r = 0; // first row
-            else if (block == 3 || block == 4 || block == 5) r = 3;
-            else if (block == 6 || block == 7 || block == 8) r = 6;
+            // the best organisms in each epoch will be stored here
+            var TheBest = new OrganismBase(0, null, Int32.MaxValue, 0);
 
-            if (block == 0 || block == 3 || block == 6) c = 0;
-            else if (block == 1 || block == 4 || block == 7) c = 3;
-            else if (block == 2 || block == 5 || block == 8) c = 6;
+            // initialize combinatorial Organisms with 90% of them workers and the rest explorers
+            // Explorers always get a new random matrix to test against.
+            var numWorker = (int)(numOrganisms * 0.90);
+            var numExplorer = numOrganisms - numWorker;
 
-            return new[] { r, c };
-        }
 
-        /// <summary>
-        /// Returns the index of one of the nine blocks, 
-        /// the one that contains the cell at the provided row/cell coordinates
-        /// </summary>
-        /// <param name="r">row index</param>
-        /// <param name="c">column index</param>
-        /// <returns>Returns the index of a block, as number left to right, top to bottom</returns>
-        public static int Block(int r, int c)
-        {
-            if (r >= 0 && r <= 2 && c >= 0 && c <= 2)
-                return 0;
-            if (r >= 0 && r <= 2 && c >= 3 && c <= 5)
-                return 1;
-            if (r >= 0 && r <= 2 && c >= 6 && c <= 8)
-                return 2;
-            if (r >= 3 && r <= 5 && c >= 0 && c <= 2)
-                return 3;
-            if (r >= 3 && r <= 5 && c >= 3 && c <= 5)
-                return 4;
-            if (r >= 3 && r <= 5 && c >= 6 && c <= 8)
-                return 5;
-            if (r >= 6 && r <= 8 && c >= 0 && c <= 2)
-                return 6;
-            if (r >= 6 && r <= 8 && c >= 3 && c <= 5)
-                return 7;
-            if (r >= 6 && r <= 8 && c >= 6 && c <= 8)
-                return 8;
-            throw new Exception("Unable to find Block()");
-        }
-
-        public static async Task<int[][]> GetRandomMatrixAsync(int[][] problem)
-        {
-            // fill each 3x3 block with 1-9
-            var result = DuplicateMatrix(problem);
-
-            for (var block = 0; block < 9; ++block)
+            // fill the hive with new organisms having a random puzzle and known error count and also if it was the best yet
+            for (var i = 0; i < numOrganisms; ++i)
             {
-                var corners = Corner(block);
-                var vals = new List<int>(9);
-                for (var i = 1; i <= 9; ++i)
+                var orgType = i < numWorker ? OrganismTypes.Worker : OrganismTypes.Explorer;
+
+                // get a new random puzzle and count the errors
+                int[][] rndMatrix = await GetRandomMatrixAsync(problem).ConfigureAwait(true);
+                var currentErrors = Errors(rndMatrix);
+
+                // create a new organism, give it the random puzzle and errors
+                Hive[i] = new Organism(orgType, rndMatrix, currentErrors, 0);
+                stats.organismsBorn++;
+
+                // track the best so far puzzle and copy it to TheBest
+                if (currentErrors < TheBest.Error)
+                {
+                    TheBest.Error = currentErrors;
+                    TheBest.Matrix = SudokuTool.DuplicateMatrix(rndMatrix);
+                    stats.randomWasTheBest++; // this should average out at some point?
+                    // Splash();
+                }
+            }
+
+            // main loop - start the generations (epochs)
+            var epoch = 0;
+            while (epoch < maxEpochs)
+            {
+                // keep a little log for every 1000 generations
+                if (epoch % 1000 == 0)
+                {
+                    _sb.AppendLine("epoch = " + epoch);
+                    _sb.AppendLine("best error = " + TheBest.Error);
+                }
+
+                // if we somehow have no errors (optimal solution!) then just stop now.
+                if (TheBest.Error == 0) // solution found
+                    break;
+
+                // process each organism and give explorers random solutions and evolve workers
+                // (with for loop)...why not foreach? because if it ages out we want to put a new organism in place
+                for (var i = 0; i < numOrganisms; ++i)
+                {
+                    // we treat Explorers differently than Workers. Explorers always get a new random matrix to test against. Workers evolve, mutate, age +/- or die of old age
+                    switch (Hive[i].Type)
+                    {
+                        case OrganismTypes.Explorer:
+                            // give it a new random matrix
+                            int[][] rndMatrix = await GetRandomMatrixAsync(problem).ConfigureAwait(true);
+                            Hive[i].Matrix = SudokuTool.DuplicateMatrix(rndMatrix);
+                            Hive[i].Error = Errors(rndMatrix);
+
+                            if (Hive[i].Error < TheBest.Error)
+                            {
+                                TheBest.Error = Hive[i].Error;
+                                TheBest.Matrix = SudokuTool.DuplicateMatrix(rndMatrix);
+                                stats.randomWasTheBest++;
+                                // Splash();
+                            }
+                            break;
+                        case OrganismTypes.Worker:
+
+                            // mutate the matrix, pick a random block and pick two random cells and swap them.
+                            int[][] evolving = await EvolveMatrixAsync(problem, Hive[i].Matrix).ConfigureAwait(true);
+                            var evolutionErrors = Errors(evolving);
+
+                            var probability = _rnd.NextDouble();
+                            var rareMutation = probability < 0.001;
+                            bool evoWorked = evolutionErrors < Hive[i].Error;
+
+                            // if the evolution is better (natural selection) or if this is a rareMutation, take it
+                            if (evoWorked || rareMutation) // better, or a mistake
+                            {
+                                // positive result to evolution provides refreshed genepool and resets age
+                                if (evoWorked)
+                                {
+                                    Hive[i].Age = 0;
+                                    stats.evolutionWorked++;
+                                }
+
+                                // if you didn't get the better end of the deal
+                                if (rareMutation && !evoWorked)
+                                    stats.mutationFailed++;
+
+                                Hive[i].Matrix = SudokuTool.DuplicateMatrix(evolving); // by value
+                                Hive[i].Error = evolutionErrors;
+
+                                if (Hive[i].Error < TheBest.Error)
+                                {
+                                    TheBest.Error = Hive[i].Error;
+                                    TheBest.Matrix = SudokuTool.DuplicateMatrix(evolving);
+                                    stats.bestMutationsEver++;
+                                    // Splash();
+                                }
+                            }
+                            else // evolved code is not better and there was no chance for forced mutation
+                            {
+                                // age this organism
+                                Hive[i].Age++;
+
+                                if (Hive[i].Age > 1000) // die - if so, get a random to replace
+                                {
+                                    stats.diedOfOldAge++;
+
+                                    // create a new replacement for the hive.
+                                    var m = await GetRandomMatrixAsync(problem).ConfigureAwait(true);
+                                    Hive[i] = new Organism(0, m, Errors(m), 0);
+                                    stats.organismsBorn++;
+                                }
+                            }
+                            break;
+
+                    }
+
+                } // each organism
+
+
+                // find the index of the best worker
+                var bestWkrIndex = SudokuTool.GetBestWorkerIndex(Hive, numWorker);
+                var bestWorker = Hive[bestWkrIndex];
+
+                // find the index of the best explorer
+                var bestExpIndex = SudokuTool.GetBestExplorerIndex(Hive, numWorker);
+                var bestExplorer = Hive[bestExpIndex];
+
+                // find the index of the worst worker
+                var worstWkrIndex = SudokuTool.GetWorstWorkerIndex(Hive, numWorker);
+
+
+                // have a  50/50 chance for each block in 2nd organism will be blended into 1st organism 
+                var babyOrg = await MatingResultAsync(bestWorker.Matrix, bestExplorer.Matrix, 0.50);
+                stats.matingPairs++;
+                var babyErr = Errors(babyOrg);
+                var genNext = new Organism(OrganismTypes.Worker, babyOrg, babyErr, 0)
+                {
+                    // generations are only incremented if one of the parents have a GeneMarker
+                    Generation = incrementGeneration(bestWorker, bestExplorer),
+                    // GeneMarker = "GenX" // might use this if you happened to want to see details later.
+                }; stats.organismsBorn++;
+
+                // replace the worst worker with the next generation of worker
+                Hive[worstWkrIndex] = genNext;
+                stats.culledCount++;
+
+                if (babyErr < TheBest.Error)
+                {
+                    TheBest.Error = babyErr;
+                    TheBest.Matrix = SudokuTool.DuplicateMatrix(babyOrg);
+                    stats.bestBabies++;
+                    // Splash();
+                }
+
+                ++epoch;
+                stats.epochsCompleted = epoch;
+            } // while
+
+
+            return TheBest.Matrix;
+        } // SolveEvo
+
+
+        /// <summary>
+        /// This creates a new random solution and maps that solution onto provided problem
+        /// </summary>
+        /// <param name="problem">int[][]</param>
+        /// <returns></returns>
+        public static Task<int[][]> GetRandomMatrixAsync(int[][] problem)
+        {
+            // make a copy of the current puzzle
+            var newRandomMatrix = SudokuTool.DuplicateMatrix(problem);
+
+
+            for (var block = 0; block < Constants.BoardSize; ++block)
+            {
+                // fill them with 1 through 9
+                var corners = SudokuTool.Corner(block);
+                var vals = new List<int>(Constants.BoardSize);
+                for (var i = 1; i <= Constants.BoardSize; ++i)
                     vals.Add(i);
 
-                // shuffle
+                // shuffle each cell with a value from another cell
                 for (var k = 0; k < vals.Count; ++k)
                 {
                     var ri = _rnd.Next(k, vals.Count);
@@ -126,7 +277,7 @@ namespace SudokuTools
                     vals[ri] = tmp;
                 }
 
-                // walk thru block and remove from list starting numbers in problem
+                // remove the random cell values from the known cell values
                 var r = corners[0];
                 var c = corners[1];
                 for (var i = r; i < r + 3; ++i)
@@ -134,41 +285,48 @@ namespace SudokuTools
                     for (var j = c; j < c + 3; ++j)
                     {
                         var v = problem[i][j];
-                        if (v != 0) // a fixed starting number
+                        if (v != 0) // a fixed starting number is assumed correct
                             vals.Remove(v);
                     }
                 }
 
-                // walk thru block and add values
+                // walk thru block and add the new values to the random solution output
                 var ptr = 0; // pointer into List
                 for (var i = r; i < r + 3; ++i)
                 {
                     for (var j = c; j < c + 3; ++j)
                     {
-                        if (result[i][j] == 0) // not occupied
+                        if (newRandomMatrix[i][j] == 0) // not occupied
                         {
                             var v = vals[ptr]; // get value from List
-                            result[i][j] = v;
+                            newRandomMatrix[i][j] = v;
                             ++ptr; // move to next value in List
                         }
                     }
                 }
             } // each block, k
 
-            return result;
+            return Task.FromResult(newRandomMatrix);
         } // RandomMatrix
 
-        public static async Task<int[][]> NeighborMatrixAsync(int[][] problem, int[][] matrix)
+
+        /// <summary>
+        /// Randomly swap the values in two cells of a random block of the supplied matrix
+        /// </summary>
+        /// <param name="problem">the original puzzle </param>
+        /// <param name="matrix">the current working solution</param>
+        /// <returns></returns>
+        public static Task<int[][]> EvolveMatrixAsync(int[][] problem, int[][] matrix)
         {
             // pick a random 3x3 block,
             // pick two random cells in block
             // swap values
 
-            var result = DuplicateMatrix(matrix);
+            var result = SudokuTool.DuplicateMatrix(matrix);
 
             var block = _rnd.Next(0, 9); // [0,8]
             //Console.WriteLine("block = " + block);
-            var corners = Corner(block);
+            var corners = SudokuTool.Corner(block);
             //Console.WriteLine("corners = " + corners[0] + " " + corners[1]);
 
 
@@ -210,42 +368,45 @@ namespace SudokuTools
             result[r1][c1] = result[r2][c2];
             result[r2][c2] = tmp;
 
-            return result;
+            return Task.FromResult(result);
         } // NeighborMatrix
 
         /// <summary>
-        /// 50/50 chance for each block in organism 2 will be blended into organism 1
+        /// for each block (3x3) in matrix2, there's a 50% chance to be added into matrix1
         /// </summary>
-        /// <param name="m1"></param>
-        /// <param name="m2"></param>
-        /// <param name="chance">50%</param>
+        /// <param name="matrix1">mating partner 1</param>
+        /// <param name="matrix2">mating partner 2</param>
+        /// <param name="chance">0.50 or some percential double value</param>
         /// <returns>a single matrix with some relationships between both provided</returns>
-        public static async Task<int[][]> ChromoCrossoverAsync(int[][] matrix1, int[][] matrix2, double chance = 0.50)
+        public static Task<int[][]> MatingResultAsync(int[][] matrix1, int[][] matrix2, double chance = 0.50)
         {
-            var result = DuplicateMatrix(matrix1);
-
+            var result = SudokuTool.DuplicateMatrix(matrix1);
             for (var block = 0; block < 9; ++block)
             {
                 if (_rnd.NextDouble() < chance)
                 {
-                    var corners = Corner(block);
+                    var corners = SudokuTool.Corner(block);
                     for (var i = corners[0]; i < corners[0] + 3; ++i)
+                    {
                         for (var j = corners[1]; j < corners[1] + 3; ++j)
+                        {
                             result[i][j] = matrix2[i][j];
+                        }
+                    }
                 }
             }
-            return await Task.FromResult(result);// Task.FromResult(result);
+            return Task.FromResult(result);// Task.FromResult(result);
         }
 
         /// <summary>
-        /// Just use this to get the next generation number by adding 1 to the latest generation's gen number.
+        /// Just use this to get the next generation number by adding 1 to the latest generation's gen number.... only if either orgs have a GeneMarker
         /// </summary>
         /// <param name="workerOrganism"></param>
         /// <param name="explorerOrganism"></param>
         /// <returns></returns>
         public static int incrementGeneration(Organism workerOrganism, Organism explorerOrganism)
         {
-            if ((workerOrganism.GeneMarker == "GenX" || explorerOrganism.GeneMarker == "GenX"))
+            if ((workerOrganism.GeneMarker != string.Empty || explorerOrganism.GeneMarker != string.Empty))
             {
                 var highest = workerOrganism.Generation < explorerOrganism.Generation
                     ? explorerOrganism.Generation : workerOrganism.Generation;
@@ -255,6 +416,7 @@ namespace SudokuTools
             return 1;
         }
 
+
         /// <summary>
         /// inspects each row and each column, taking count each time a number is missing
         /// </summary>
@@ -262,42 +424,41 @@ namespace SudokuTools
         /// <returns></returns>
         public static int Errors(int[][] matrix)
         {
+            int boardSize = Constants.BoardSize;// assumes blocks are OK (one each 1-9)
             var err = 0;
-            // assumes blocks are OK (one each 1-9)
 
             // rows error
-            for (var i = 0; i < Constants.BoardSize; ++i) // each row
+            for (var i = 0; i < boardSize; ++i) // each row
             {
-                int[] counts = new int[Constants.BoardSize]; // [0] = count of 1s, [1] = count of 2s
+                int[] errorsInRow = new int[boardSize]; // [0] = count of 1s, [1] = count of 2s
 
-
-                for (var j = 0; j < Constants.BoardSize; ++j) // walk down column of curr row
+                for (var j = 0; j < boardSize; ++j) // walk down column of curr row
                 {
-                    var v = matrix[i][j]; // 1 to 9
-                    ++counts[v - 1];
+                    var v = matrix[i][j]; // 1 to 9                 
+                    ++errorsInRow[v - 1];   // counts[0-8]
                 }
 
-                for (var k = 0; k < Constants.BoardSize; ++k) // number missing 
+                for (var k = 0; k < boardSize; ++k) // add up the number of zeros found in each row
                 {
-                    if (counts[k] == 0)
+                    if (errorsInRow[k] == 0)
                         ++err;
                 }
             } // each row
 
             // columns error
-            for (var j = 0; j < Constants.BoardSize; ++j) // each column
+            for (var j = 0; j < boardSize; ++j) // each column
             {
-                var counts = new int[Constants.BoardSize]; // [0] = count of 1s, [1] = count of 2s
+                var errorsInColumn = new int[boardSize]; // [0] = count of 1s, [1] = count of 2s
 
-                for (var i = 0; i < Constants.BoardSize; ++i) // walk down 
+                for (var i = 0; i < boardSize; ++i) // walk down 
                 {
                     var v = matrix[i][j]; // 1 to 9
-                    ++counts[v - 1]; // counts[0-8]
+                    ++errorsInColumn[v - 1]; // counts[0-8]
                 }
 
-                for (var k = 0; k < Constants.BoardSize; ++k) // number missing in the colum
+                for (var k = 0; k < boardSize; ++k) // add up the number of zeros found in each column
                 {
-                    if (counts[k] == 0)
+                    if (errorsInColumn[k] == 0)
                         ++err;
                 }
             } // each column
@@ -305,170 +466,5 @@ namespace SudokuTools
             return err;
         } // Error
 
-        private async Task<int[][]> SolveAsync(int[][] problem, int numOrganisms, int maxEpochs)
-        {
-            // initialize combinatorial Organisms
-            var numWorker = (int)(numOrganisms * 0.90);
-            var numExplorer = numOrganisms - numWorker;
-            Hive = new List<Organism>(new Organism[numOrganisms]);
-            TheBest = new OrganismBase(0, null, Int32.MaxValue, 0);
-
-            // fill the hive with new organisms
-            for (var i = 0; i < numOrganisms; ++i)
-            {
-                var orgType = i < numWorker ? OrganismTypes.Worker : OrganismTypes.Explorer;
-
-                var rndMatrix = await GetRandomMatrixAsync(problem).ConfigureAwait(true);
-                var thisErr = Errors(rndMatrix);
-
-                Hive[i] = new Organism(orgType, rndMatrix, thisErr, 0);
-
-                if (thisErr < TheBest.Error)
-                {
-                    TheBest.Error = thisErr;
-                    TheBest.Matrix = DuplicateMatrix(rndMatrix);
-                    stats.randomWasTheBest++;
-                   // Splash();
-                }
-            }
-
-            // main loop
-            var epoch = 0;
-            while (epoch < maxEpochs)
-            {
-                if (epoch % 1000 == 0)
-                {
-                    _sb.AppendLine("epoch = " + epoch);
-                    _sb.AppendLine("best error = " + TheBest.Error);
-                }
-
-                if (TheBest.Error == 0) // solution found
-                    break;
-
-                // process each organism
-                for (var i = 0; i < numOrganisms; ++i)
-                {
-
-                    if (Hive[i].Type == OrganismTypes.Worker) // worker
-                    {
-
-                        // get a neighbor matrix, pick a random block and pick two random cells and swap them.
-                        var neighbor = await NeighborMatrixAsync(problem, Hive[i].Matrix).ConfigureAwait(true);
-                        var neighborErrors = Errors(neighbor);
-
-                        var prob = _rnd.NextDouble();
-                        var mutation = prob < 0.001;
-                        if (neighborErrors < Hive[i].Error || mutation) // better, or a mistake
-                        {
-                            // refreshed genepool resets age
-                            if (neighborErrors < Hive[i].Error)
-                                Hive[i].Age = 0;
-
-                            // if you didn't get the better end of the deal
-                            if (mutation && neighborErrors > Hive[i].Error)
-                                stats.naturalMisselection++;
-
-                            Hive[i].Matrix = DuplicateMatrix(neighbor); // by value
-                            Hive[i].Error = neighborErrors;
-
-                            if (Hive[i].Error < TheBest.Error)
-                            {
-                                TheBest.Error = Hive[i].Error;
-                                TheBest.Matrix = DuplicateMatrix(neighbor);
-                                stats.bestMutationsEver++;
-                               // Splash();
-                            }
-                        }
-                        else // neighbor is not better
-                        {
-                            // age this organism
-                            Hive[i].Age++;
-                            if (Hive[i].Age > 1000) // die - if so, get a random to replace
-                            {
-                                stats.oldAgeKilled++;
-                                var m = await GetRandomMatrixAsync(problem).ConfigureAwait(true);
-                                Hive[i] = new Organism(0, m, Errors(m), 0);
-                            }
-                        }
-                    } // worker
-                    else if (Hive[i].Type == OrganismTypes.Explorer) // explorer
-                    {
-                        var rndMatrix = await GetRandomMatrixAsync(problem).ConfigureAwait(true);
-                        Hive[i].Matrix = DuplicateMatrix(rndMatrix);
-                        Hive[i].Error = Errors(rndMatrix);
-
-                        if (Hive[i].Error < TheBest.Error)
-                        {
-                            TheBest.Error = Hive[i].Error;
-                            TheBest.Matrix = DuplicateMatrix(rndMatrix);
-                            stats.randomWasTheBest++;
-                           // Splash();
-                        }
-                    }
-                } // each organism
-
-                // merge best worker with best explorer into worst worker
-                var bestWkrIndex = 0; // index of best worker
-                var smallestWorkerError = Hive[0].Error;
-                for (var i = 0; i < numWorker; ++i)
-                {
-                    if (Hive[i].Error < smallestWorkerError)
-                    {
-                        smallestWorkerError = Hive[i].Error;
-                        bestWkrIndex = i;
-                    }
-                }
-
-                var bestExpIndex = numWorker; // index of best explorer
-                var smallestExplorerError = Hive[numWorker].Error;
-                for (var i = numWorker; i < numOrganisms; ++i)
-                {
-                    if (Hive[i].Error < smallestExplorerError)
-                    {
-                        smallestExplorerError = Hive[i].Error;
-                        bestExpIndex = i;
-                    }
-                }
-
-                var worstWkrIndex = 0; // index of worst worker
-                var largestWorkerError = Hive[0].Error;
-                for (var i = 0; i < numWorker; ++i)
-                {
-                    if (Hive[i].Error > largestWorkerError)
-                    {
-                        largestWorkerError = Hive[i].Error;
-                        worstWkrIndex = i;
-                    }
-                }
-
-                
-                var bestWorker = Hive[bestWkrIndex];
-                var bestExplorer = Hive[bestExpIndex];
-                // have a  50/50 chance for each block in 2nd organism will be blended into 1st organism 
-                var merged = await ChromoCrossoverAsync(bestWorker.Matrix, bestExplorer.Matrix, 0.50);
-                var mergedErr = Errors(merged);
-                var genNext = new Organism(OrganismTypes.Worker, merged, mergedErr, 0, "GenX")
-                {
-                    Generation = incrementGeneration(bestWorker, bestExplorer)
-                };
-
-                // replace the worst worker with the next generation of worker
-                Hive[worstWkrIndex] = genNext;
-                stats.culledCount++;
-
-
-                if (mergedErr < TheBest.Error)
-                {
-                    TheBest.Error = mergedErr;
-                    TheBest.Matrix = DuplicateMatrix(merged);
-                    stats.bestBabies++;
-                   // Splash();
-                }
-
-                ++epoch;
-                stats.epochsCompleted = epoch;
-            } // while
-            return TheBest.Matrix;
-        } // SolveEvo
     }
 }

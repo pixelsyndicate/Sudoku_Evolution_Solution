@@ -31,28 +31,30 @@ namespace ToolsTests
         }
 
         [Theory]
-        [InlineData(ProblemLevels.Easy)]
-        [InlineData(ProblemLevels.Tough)]
-        [InlineData(ProblemLevels.Difficult)]
-        [InlineData(ProblemLevels.VeryDifficult)]
-        [InlineData(ProblemLevels.ExtremelyDifficult)]
-        [InlineData(ProblemLevels.MostDifficult)]
-        public void CAN_I_SOLVE_VARIOUS_PROBLEMS(ProblemLevels diff)
+        [InlineData(ProblemLevels.Easy, 15, 5000, 20)]
+        [InlineData(ProblemLevels.Tough, 15, 5000, 20)]
+        [InlineData(ProblemLevels.Difficult, 50, 5000, 20)]
+        [InlineData(ProblemLevels.VeryDifficult, 50, 5000, 20)]
+        [InlineData(ProblemLevels.VeryDifficult, 200, 5000, 20)]
+        //[InlineData(ProblemLevels.ExtremelyDifficult, 200, 5000, 40)]
+        //[InlineData(ProblemLevels.MostDifficult, 200, 5000, 40)]
+        public void CAN_I_SOLVE_VARIOUS_PROBLEMS(ProblemLevels diff, int organisms, int maxEpochs, int maxExtinctions)
         {
             Problem problem = ProblemGenerator.GetProblem(diff);
             _evo = new EvolutionSolution();
-            int[][] result = _evo.SolveWithinExtinctions(problem.Rows, 15, 5000, 20).Result;
+            Debug.WriteLine($"Attempting solution of {diff.ToString()} with {organisms} organisms \n");
+            int[][] result = _evo.SolveWithinExtinctions(problem.Rows, organisms, maxEpochs, maxExtinctions).Result;
             var resultErrors = EvolutionSolution.Errors(result);
 
-
-            if (EvolutionSolution.Errors(result) == 0)
+            bool optimalResult = (resultErrors == 0);
+            if (optimalResult)
                 Debug.WriteLine("Optimal solution found. \n");
             else
                 Debug.WriteLine("Did not find optimal solution \n");
 
             Debug.WriteLine("\nBest solution found: \n");
             _disp.DisplayMatrix(result);
-
+            Assert.True(optimalResult);
 
         }
 
