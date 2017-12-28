@@ -15,6 +15,7 @@ This is a Combinatorial Evolution C# .NET project following the examples from an
 
 ### The Organism
 The Organism: Represents a possible solution to the problem
+	
 	• Type: 0=Worker, 1=Explorer
 	• Matrix: represents a possible solution (int[][] or array-of-arrays)
 	• Error: the number of constrains that are violated for this solution (0 = optimal)
@@ -22,6 +23,7 @@ The Organism: Represents a possible solution to the problem
 
 ### Measure of Error
 Measure of Error : the sum of missing numbers in rows and columns.
+	
 	this is displayed for the best organism. 
 	Tends to get a very good solution (error=2) very quickly, but then gets stuck. 
 	The restart process is one mechanism to combat this characteristic, and is a common technique in many optimization algorithms. 
@@ -66,4 +68,27 @@ Steps in the SolveEvo() method.
 	• Merge (mate) the best worker and best explorer and replace the worst worker
 		○ For each block (1-9) of the best explorer, there's a 50/50 chance to copy its contents to the best workers block.
 		○ That child solution is used to replace the worst worker organism.
+
+### Testing The Code
+
+As this method of finding solutions is based off of random action over multiple generations of multiple organisms, the time it takes to solve a problem of various difficulties is hard to predict. Through much testing with console applications or xUnit tests, i've come up with some base parameters to use in each case.
+	
+	The Easy puzzle -solved with 100 organisms in under 5000 epochs taking around 25 seconds.
+	The Medium puzzle -solved with only 50 organisms, under 5000 epochs taking 41 seconds. Using 100 organisms allowed me to solve in 25 seconds.	
+	The Hard puzzle -solved with 150 organisms, under 5000 epochs taking 12 seconds.
+	The Insane puzzle -solved with 150 organisms, under 5000 epochs taking 42 seconds.
+	the Impossible puzzle wasn't solved with 150 organisms at the time of this edit.
+
+### Failing Tests Take Longer
+It may appear when looking at the above solution statistics that throwing more organisms at a puzzle solves faster, but in my tests, the penalty you get happens when you fail to find the optimal solution... The hive runs the full 5000 epochs with up to 20 extinctions (100,000 years time if an epoch in this sense is equal to 1 year of organism life).
+
+Here is the times I've recorded for non-optimal solution runs by the number of organisms used:
+	
+	Organisms Used 	Time Taken Before Giving Up
+	25		00:12
+	50		00:23
+	75		00:35
+	100		00:47
+	150		01:11
+	200		01:38
 
