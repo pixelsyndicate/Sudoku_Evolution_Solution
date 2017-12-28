@@ -10,7 +10,7 @@ namespace SudokuTools
         private static Random _rnd = new Random();
         private static StringBuilder _sb = new StringBuilder();
         private static int[][] OriginalMatrix;
-        private EvolutionStats stats = new EvolutionStats();
+        public EvolutionStats stats = new EvolutionStats();
 
         //  private List<Organism> Hive;
         //  private OrganismBase TheBest;
@@ -29,7 +29,7 @@ namespace SudokuTools
         public async Task<int[][]> SolveWithinExtinctions(int[][] problem, int numOrganisms, int maxEpochs, int maxExtinctions)
         {
             stats.organismsBorn += numOrganisms;
-           OriginalMatrix = SudokuTool.DuplicateMatrix(problem);
+            OriginalMatrix = SudokuTool.DuplicateMatrix(problem);
             // wrapper for SolveEvo()
             var err = int.MaxValue;
             var seed = 0;
@@ -42,7 +42,7 @@ namespace SudokuTools
                 _sb.AppendLine("\nseed = " + seed);
                 _rnd = new Random(seed);
                 bestSolution = await SolveAsync(problem, numOrganisms, maxEpochs).ConfigureAwait(true);
-                err = Errors(bestSolution);
+                err = SudokuTool.Errors(bestSolution);
                 ++seed;
                 ++attempt;
                 stats.extinctions++;
@@ -58,7 +58,7 @@ Best Mutation Ever: {stats.bestMutationsEver} | Worst Organisms Retired: {stats.
 Mating Pairs: {stats.matingPairs} | Babies Were Best: {stats.bestBabies} ");
 
             System.Diagnostics.Debug.WriteLine(
-               $@"Evolution that turned out for the best: {(double)(stats.bestMutationsEver/stats.evolutionWorked)*100 }%");
+               $@"Evolution that turned out for the best: {(double)(stats.bestMutationsEver / stats.evolutionWorked) * 100 }%");
 
             System.Diagnostics.Debug.WriteLine(
                $@"Mating that resulted in KHAN: {stats.bestBabies / stats.matingPairs * 100}%");
@@ -96,7 +96,7 @@ Mating Pairs: {stats.matingPairs} | Babies Were Best: {stats.bestBabies} ");
 
                 // get a new random puzzle and count the errors
                 int[][] rndMatrix = await GetRandomMatrixAsync(problem).ConfigureAwait(true);
-                var currentErrors = Errors(rndMatrix);
+                var currentErrors = SudokuTool.Errors(rndMatrix);
 
                 // create a new organism, give it the random puzzle and errors
                 Hive[i] = new Organism(orgType, rndMatrix, currentErrors, 0);
@@ -138,7 +138,7 @@ Mating Pairs: {stats.matingPairs} | Babies Were Best: {stats.bestBabies} ");
                             // give it a new random matrix
                             int[][] rndMatrix = await GetRandomMatrixAsync(problem).ConfigureAwait(true);
                             Hive[i].Matrix = SudokuTool.DuplicateMatrix(rndMatrix);
-                            Hive[i].Error = Errors(rndMatrix);
+                            Hive[i].Error = SudokuTool.Errors(rndMatrix);
 
                             if (Hive[i].Error < TheBest.Error)
                             {
@@ -152,7 +152,7 @@ Mating Pairs: {stats.matingPairs} | Babies Were Best: {stats.bestBabies} ");
 
                             // mutate the matrix, pick a random block and pick two random cells and swap them.
                             int[][] evolving = await EvolveMatrixAsync(problem, Hive[i].Matrix).ConfigureAwait(true);
-                            var evolutionErrors = Errors(evolving);
+                            var evolutionErrors = SudokuTool.Errors(evolving);
 
                             var probability = _rnd.NextDouble();
                             var rareMutation = probability < 0.001;
@@ -194,7 +194,7 @@ Mating Pairs: {stats.matingPairs} | Babies Were Best: {stats.bestBabies} ");
 
                                     // create a new replacement for the hive.
                                     var m = await GetRandomMatrixAsync(problem).ConfigureAwait(true);
-                                    Hive[i] = new Organism(0, m, Errors(m), 0);
+                                    Hive[i] = new Organism(0, m, SudokuTool.Errors(m), 0);
                                     stats.organismsBorn++;
                                 }
                             }
@@ -220,7 +220,7 @@ Mating Pairs: {stats.matingPairs} | Babies Were Best: {stats.bestBabies} ");
                 // have a  50/50 chance for each block in 2nd organism will be blended into 1st organism 
                 var babyOrg = await MatingResultAsync(bestWorker.Matrix, bestExplorer.Matrix, 0.50);
                 stats.matingPairs++;
-                var babyErr = Errors(babyOrg);
+                var babyErr = SudokuTool.Errors(babyOrg);
                 var genNext = new Organism(OrganismTypes.Worker, babyOrg, babyErr, 0)
                 {
                     // generations are only incremented if one of the parents have a GeneMarker
@@ -417,54 +417,6 @@ Mating Pairs: {stats.matingPairs} | Babies Were Best: {stats.bestBabies} ");
         }
 
 
-        /// <summary>
-        /// inspects each row and each column, taking count each time a number is missing
-        /// </summary>
-        /// <param name="matrix"></param>
-        /// <returns></returns>
-        public static int Errors(int[][] matrix)
-        {
-            int boardSize = Constants.BoardSize;// assumes blocks are OK (one each 1-9)
-            var err = 0;
-
-            // rows error
-            for (var i = 0; i < boardSize; ++i) // each row
-            {
-                int[] errorsInRow = new int[boardSize]; // [0] = count of 1s, [1] = count of 2s
-
-                for (var j = 0; j < boardSize; ++j) // walk down column of curr row
-                {
-                    var v = matrix[i][j]; // 1 to 9                 
-                    ++errorsInRow[v - 1];   // counts[0-8]
-                }
-
-                for (var k = 0; k < boardSize; ++k) // add up the number of zeros found in each row
-                {
-                    if (errorsInRow[k] == 0)
-                        ++err;
-                }
-            } // each row
-
-            // columns error
-            for (var j = 0; j < boardSize; ++j) // each column
-            {
-                var errorsInColumn = new int[boardSize]; // [0] = count of 1s, [1] = count of 2s
-
-                for (var i = 0; i < boardSize; ++i) // walk down 
-                {
-                    var v = matrix[i][j]; // 1 to 9
-                    ++errorsInColumn[v - 1]; // counts[0-8]
-                }
-
-                for (var k = 0; k < boardSize; ++k) // add up the number of zeros found in each column
-                {
-                    if (errorsInColumn[k] == 0)
-                        ++err;
-                }
-            } // each column
-
-            return err;
-        } // Error
 
     }
 }

@@ -16,10 +16,10 @@ namespace ToolsTests
             Problem problem = ProblemGenerator.GetProblem(ProblemLevels.Easy);
             _evo = new EvolutionSolution();
             int[][] result = _evo.SolveWithinExtinctions(problem.Rows, 15, 5000, 20).Result;
-            var resultErrors = EvolutionSolution.Errors(result);
+            var resultErrors = SudokuTool.Errors(result);
             Assert.Equal(0, resultErrors);
 
-            if (EvolutionSolution.Errors(result) == 0)
+            if (SudokuTool.Errors(result) == 0)
                 Debug.WriteLine("Optimal solution found. \n");
             else
                 Debug.WriteLine("Did not find optimal solution \n");
@@ -44,7 +44,7 @@ namespace ToolsTests
             _evo = new EvolutionSolution();
             Debug.WriteLine($"Attempting solution of {diff.ToString()} with {organisms} organisms \n");
             int[][] result = _evo.SolveWithinExtinctions(problem.Rows, organisms, maxEpochs, maxExtinctions).Result;
-            var resultErrors = EvolutionSolution.Errors(result);
+            var resultErrors = SudokuTool.Errors(result);
 
             bool optimalResult = (resultErrors == 0);
             if (optimalResult)

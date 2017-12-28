@@ -130,6 +130,56 @@ namespace SudokuTools
             }
             return worstWkrIndex;
         }
+
+
+        /// <summary>
+        /// inspects each row and each column, taking count each time a number is missing
+        /// </summary>
+        /// <param name="matrix"></param>
+        /// <returns></returns>
+        public static int Errors(int[][] matrix)
+        {
+            int boardSize = Constants.BoardSize;// assumes blocks are OK (one each 1-9)
+            var err = 0;
+
+            // rows error
+            for (var i = 0; i < boardSize; ++i) // each row
+            {
+                int[] errorsInRow = new int[boardSize]; // [0] = count of 1s, [1] = count of 2s
+
+                for (var j = 0; j < boardSize; ++j) // walk down column of curr row
+                {
+                    var v = matrix[i][j]; // 1 to 9                 
+                    ++errorsInRow[v - 1];   // counts[0-8]
+                }
+
+                for (var k = 0; k < boardSize; ++k) // add up the number of zeros found in each row
+                {
+                    if (errorsInRow[k] == 0)
+                        ++err;
+                }
+            } // each row
+
+            // columns error
+            for (var j = 0; j < boardSize; ++j) // each column
+            {
+                var errorsInColumn = new int[boardSize]; // [0] = count of 1s, [1] = count of 2s
+
+                for (var i = 0; i < boardSize; ++i) // walk down 
+                {
+                    var v = matrix[i][j]; // 1 to 9
+                    ++errorsInColumn[v - 1]; // counts[0-8]
+                }
+
+                for (var k = 0; k < boardSize; ++k) // add up the number of zeros found in each column
+                {
+                    if (errorsInColumn[k] == 0)
+                        ++err;
+                }
+            } // each column
+
+            return err;
+        } // Error
     }
 
 }

@@ -11,8 +11,6 @@
         {
             GeneMarker = tag;
         }
-
-
     }
 
     /// <summary>
@@ -21,10 +19,9 @@
     public class OrganismBase
     {
         public OrganismTypes Type;  // 0 = worker, 1 = explorer
-        public int[][] Matrix;
+        public int[][] Matrix { get; set; }
         public int Error;
         public int Age;
-        private int[][] m;
 
         public OrganismBase(OrganismTypes type, int[][] m, int error, int age)
         {

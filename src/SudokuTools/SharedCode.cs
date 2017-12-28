@@ -125,11 +125,25 @@ namespace SudokuTools
             Console.ForegroundColor = ConsoleColor.Green;
             Console.WriteLine(" -- Statistics -- ");
             Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"Organisms Created: {stats.organismsBorn}");
+            Console.WriteLine($"Organisms Culled: {stats.culledCount}");
+            double ccRatio = (double)stats.culledCount / stats.organismsBorn;
+            Console.WriteLine("Culled / Created Ratio: " + ccRatio.ToString("P2"));
             Console.WriteLine($"Epochs Completed: {stats.epochsCompleted}");
             Console.WriteLine($"Great Extinctions: {stats.extinctions}");
+            Console.WriteLine($"Failed Mutations: {stats.mutationFailed} | Evolution Successes: {stats.evolutionWorked} ");
+            double meRatio = (double)stats.mutationFailed / stats.evolutionWorked;
+            Console.WriteLine("Mutation / Evolution Ratio: " + meRatio.ToString("P2"));
             Console.WriteLine($"{stats.diedOfOldAge} organisms aged-out.");
-            Console.WriteLine($"{stats.culledCount} organisms culled.");
-            
+            Console.WriteLine($" Mating Pairs: { stats.matingPairs} | Babies Were Best: { stats.bestBabies}");
+            double mpbbRatio = (double)stats.bestBabies / stats.matingPairs;
+            Console.WriteLine("Mating Pairs / Alpha Babies Ratio: " + mpbbRatio.ToString("P2"));
+            Console.WriteLine($"{stats.randomWasTheBest} random organisms became Alphas.");
+            Console.WriteLine($"{stats.bestMutationsEver} mutated organisms became Alphas.");
+
+            double rbbbRatio = (double)stats.randomWasTheBest / stats.bestMutationsEver;
+            Console.WriteLine("Random Alpha / Mutation Alpha Ratio: " + rbbbRatio.ToString("P2"));
+
         }
     }
 
