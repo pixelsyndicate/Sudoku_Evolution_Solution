@@ -11,14 +11,20 @@ namespace SudokuTools
         Complete
     }
 
+    public enum SolutionStatus
+    {
+        Optimal,
+        Close,
+        Invalid
+    }
+
     public enum ProblemLevels
     {
         Easy = 3,
-        Difficult = 5,
-        VeryDifficult = 8,
-        ExtremelyDifficult = 13,
-        MostDifficult = 21,
-        Tough
+        Medium = 5,
+        Hard = 8,
+        Insane = 13,
+        Impossible = 21
     }
 
 
@@ -93,7 +99,8 @@ namespace SudokuTools
 
     public interface IDisplayMatrix {
         void DisplayMatrix(int[][] matrix);
-        void SplashView(EvolutionStats stats, int[][] originalMatrix, int[][] bestMatrix);
+        void SplashView(SudokuTool.TestResult testResults, EvolutionStats stats, int[][] originalMatrix,
+            int[][] bestMatrix);
     }
     public class ConsoleDisplayMatrix : IDisplayMatrix
     {
@@ -115,34 +122,53 @@ namespace SudokuTools
             Console.WriteLine("\n");
         }
 
-        public void SplashView(EvolutionStats stats, int[][] originalMatrix, int[][] bestMatrix)
+        public void SplashView(SudokuTool.TestResult testResults, EvolutionStats stats, int[][] originalMatrix,
+            int[][] bestMatrix)
         {
             Console.Clear();
             DisplayMatrix(originalMatrix);
             Console.WriteLine("\nSearching for Best solution: \n");
-            Console.ForegroundColor = ConsoleColor.Cyan;
+           
+
+            if(testResults.isOptimal==false)
+            {
+                Console.ForegroundColor = (ConsoleColor.Red);
+                Console.WriteLine(" Did not find optimal solution \nBest solution found: \n");
+            }
+            else
+            {
+                Console.ForegroundColor = ConsoleColor.Cyan;
+                Console.WriteLine("Optimal solution found. \n");
+            }
+
             DisplayMatrix(bestMatrix);
+
             Console.ForegroundColor = ConsoleColor.Green;
             Console.WriteLine(" -- Statistics -- ");
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"Organisms Created: {stats.organismsBorn}");
-            Console.WriteLine($"Organisms Culled: {stats.culledCount}");
-            double ccRatio = (double)stats.culledCount / stats.organismsBorn;
-            Console.WriteLine("Culled / Created Ratio: " + ccRatio.ToString("P2"));
-            Console.WriteLine($"Epochs Completed: {stats.epochsCompleted}");
-            Console.WriteLine($"Great Extinctions: {stats.extinctions}");
-            Console.WriteLine($"Failed Mutations: {stats.mutationFailed} | Evolution Successes: {stats.evolutionWorked} ");
-            double meRatio = (double)stats.mutationFailed / stats.evolutionWorked;
-            Console.WriteLine("Mutation / Evolution Ratio: " + meRatio.ToString("P2"));
-            Console.WriteLine($"{stats.diedOfOldAge} organisms aged-out.");
-            Console.WriteLine($" Mating Pairs: { stats.matingPairs} | Babies Were Best: { stats.bestBabies}");
-            double mpbbRatio = (double)stats.bestBabies / stats.matingPairs;
-            Console.WriteLine("Mating Pairs / Alpha Babies Ratio: " + mpbbRatio.ToString("P2"));
-            Console.WriteLine($"{stats.randomWasTheBest} random organisms became Alphas.");
-            Console.WriteLine($"{stats.bestMutationsEver} mutated organisms became Alphas.");
 
+            // show some stats
+            Console.WriteLine($@"Final Status: {testResults.resultStatus}
+Errors: {testResults.errorCount}
+-- Stats -- 
+| Epochs (years): {stats.epochsCompleted} 
+| Mass Extinctions (resets): {stats.extinctions} 
+| Organisms Created: {stats.organismsBorn} | Died of Old Age (>999 years): {stats.diedOfOldAge} 
+| Mutation Fails: {stats.mutationFailed} | Evolution Successes: {stats.evolutionWorked} 
+| Worst Replaced by Mating Results: {stats.culledCount} | Mating Results Were Best: {stats.bestBabies} 
+| Rare Mutation Was Best: {stats.bestMutationsEver} | Random Solution Was Best: {stats.randomWasTheBest} ");
+
+            var mutationvsevolution = ((double)stats.bestMutationsEver / stats.evolutionWorked);
+           
+            
+              double ccRatio = (double)stats.culledCount / stats.organismsBorn;
+            
+  double meRatio = (double)stats.mutationFailed / stats.evolutionWorked;
+           
+            double mpbbRatio = (double)stats.bestBabies / stats.matingPairs;
+
+          
             double rbbbRatio = (double)stats.randomWasTheBest / stats.bestMutationsEver;
-            Console.WriteLine("Random Alpha / Mutation Alpha Ratio: " + rbbbRatio.ToString("P2"));
 
         }
     }
@@ -167,7 +193,8 @@ namespace SudokuTools
             System.Diagnostics.Debug.WriteLine("\n");
         }
 
-        public void SplashView(EvolutionStats stats, int[][] originalMatrix, int[][] bestMatrix)
+        public void SplashView(SudokuTool.TestResult testResults, EvolutionStats stats, int[][] originalMatrix,
+            int[][] bestMatrix)
         {
            // System.Diagnostics.Debug.Clear();
             DisplayMatrix(originalMatrix);
@@ -187,26 +214,27 @@ namespace SudokuTools
 
     public class EvolutionStats
     {
-        internal int extinctions;
-        internal int randomWasTheBest;
+        public int extinctions;
+        public int randomWasTheBest;
         /// <summary>
         /// how many times a mutation happened that was detremental
         /// </summary>
-        internal int mutationFailed;
+        public int mutationFailed;
         /// <summary>
         /// how many times a mutation or evolution was positive
         /// </summary>
-        internal int evolutionWorked;
+        public int evolutionWorked;
         /// <summary>
         /// how many times evolution or mutation became the new alpha
         /// </summary>
-        internal int bestMutationsEver;
-        internal int diedOfOldAge;
-        internal int epochsCompleted;
-        internal int bestBabies;
-        internal int culledCount;
-        internal int organismsBorn;
-        internal int matingPairs;
+        public int bestMutationsEver;
+
+        public int diedOfOldAge;
+        public int epochsCompleted;
+        public int bestBabies;
+        public int culledCount;
+        public int organismsBorn;
+        public int matingPairs;
     }
 
 }

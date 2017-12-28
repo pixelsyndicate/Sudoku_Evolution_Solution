@@ -10,11 +10,9 @@ namespace ToolsTests
 
         [Theory]
         [InlineData(ProblemLevels.Easy)]
-        [InlineData(ProblemLevels.Tough)]
-        [InlineData(ProblemLevels.Difficult)]
-        [InlineData(ProblemLevels.VeryDifficult)]
-        [InlineData(ProblemLevels.ExtremelyDifficult)]
-        [InlineData(ProblemLevels.MostDifficult)]
+        [InlineData(ProblemLevels.Medium)]
+        [InlineData(ProblemLevels.Hard)]
+        [InlineData(ProblemLevels.Insane)]
         public void Can_I_Get_Problems_From_Generator(ProblemLevels lev)
         {
             Problem problem = ProblemGenerator.GetProblem(lev);
@@ -24,11 +22,9 @@ namespace ToolsTests
 
         [Theory]
         [InlineData(ProblemLevels.Easy)]
-        [InlineData(ProblemLevels.Tough)]
-        [InlineData(ProblemLevels.Difficult)]
-        [InlineData(ProblemLevels.VeryDifficult)]
-        [InlineData(ProblemLevels.ExtremelyDifficult)]
-        [InlineData(ProblemLevels.MostDifficult)]
+        [InlineData(ProblemLevels.Medium)]
+        [InlineData(ProblemLevels.Hard)]
+        [InlineData(ProblemLevels.Insane)]
         public void Does_Problem_Have_Nine_Cells(ProblemLevels lev)
         {
             Problem problem = ProblemGenerator.GetProblem(lev);
@@ -39,22 +35,20 @@ namespace ToolsTests
 
         [Theory]
         [InlineData(ProblemLevels.Easy)]
-        [InlineData(ProblemLevels.Tough)]
-        [InlineData(ProblemLevels.Difficult)]
-        [InlineData(ProblemLevels.VeryDifficult)]
-        [InlineData(ProblemLevels.ExtremelyDifficult)]
-        [InlineData(ProblemLevels.MostDifficult)]
+        [InlineData(ProblemLevels.Medium)]
+        [InlineData(ProblemLevels.Hard)]
+        [InlineData(ProblemLevels.Insane)]
         public void Does_Sample_Problem_Have_Correct_Values(ProblemLevels lev)
         {
             Problem problem = ProblemGenerator.GetProblem(lev);
 
             var expectedProblem =
                 (lev == ProblemLevels.Easy) ? SampleProblems.easyProblem() :
-                (lev == ProblemLevels.Tough) ? SampleProblems.toughProblem() :
-                (lev == ProblemLevels.Difficult) ? SampleProblems.difficultProblem() :
-                (lev == ProblemLevels.VeryDifficult) ? SampleProblems.veryDifficultProblem() :
-                (lev == ProblemLevels.ExtremelyDifficult) ? SampleProblems.extremelyDifficultProblem() :
-               (lev == ProblemLevels.MostDifficult) ? SampleProblems.mostDifficultProblem() : SampleProblems.easyProblem();
+                (lev == ProblemLevels.Medium) ? SampleProblems.mediumProblem() :
+                (lev == ProblemLevels.Hard) ? SampleProblems.hardProblem() :
+                (lev == ProblemLevels.Insane) ? SampleProblems.insaneProblem() : 
+                (lev == ProblemLevels.Impossible) ? SampleProblems.impossibleProblem()
+            : SampleProblems.easyProblem();
 
             for (int i = 0; i < problem.Rows.Length; i++)
             {
