@@ -357,7 +357,7 @@ namespace SudokuTools
         /// <param name="chance">0.50 or some percential double value</param>
         /// <param name="rand">pass in your random object if you got one</param>
         /// <returns>a single matrix with some relationships between both provided</returns>
-        public static int[][] MatingResultAsync(int[][] matrix1, int[][] matrix2, double chance = 0.50, Random rand = null)
+        public static int[][] MatingResult(int[][] matrix1, int[][] matrix2, double chance = 0.50, Random rand = null)
         {
             Random rnd = rand ?? new Random();
             var result = SudokuTool.DuplicateMatrix(matrix1);

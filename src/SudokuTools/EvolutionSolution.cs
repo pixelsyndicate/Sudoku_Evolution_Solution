@@ -108,8 +108,8 @@ namespace SudokuTools
                 var orgType = i < numWorker ? OrganismTypes.Worker : OrganismTypes.Explorer;
 
                 // get a new random puzzle and count the errors
-                int[][] rndMatrix = SudokuTool.GetRandomMatrix(problem, _rnd);
-                var currentErrors = SudokuTool.Errors(rndMatrix);
+                int[][] rndMatrix = await Task.FromResult(SudokuTool.GetRandomMatrix(problem, _rnd));
+                var currentErrors = await Task.FromResult(SudokuTool.Errors(rndMatrix));
 
                 // create a new organism, give it the random puzzle and errors
                 Hive[i] = new Organism(orgType, rndMatrix, currentErrors, 0);
@@ -119,7 +119,7 @@ namespace SudokuTools
                 if (currentErrors < TheBest.Error)
                 {
                     TheBest.Error = currentErrors;
-                    TheBest.Matrix = SudokuTool.DuplicateMatrix(rndMatrix);
+                    TheBest.Matrix = await Task.FromResult(SudokuTool.DuplicateMatrix(rndMatrix));
                     _stats.randomWasTheBest++; // this should average out at some point?
                     // Splash();
                 }
@@ -149,9 +149,9 @@ namespace SudokuTools
                     {
                         case OrganismTypes.Explorer:
                             // give it a new random matrix
-                            int[][] rndMatrix = SudokuTool.GetRandomMatrix(problem, _rnd);
-                            Hive[i].Matrix = SudokuTool.DuplicateMatrix(rndMatrix);
-                            Hive[i].Error = SudokuTool.Errors(rndMatrix);
+                            int[][] rndMatrix = await Task.FromResult(SudokuTool.GetRandomMatrix(problem, _rnd));
+                            Hive[i].Matrix = await Task.FromResult(SudokuTool.DuplicateMatrix(rndMatrix));
+                            Hive[i].Error = await Task.FromResult(SudokuTool.Errors(rndMatrix));
 
                             if (Hive[i].Error < TheBest.Error)
                             {
@@ -164,8 +164,8 @@ namespace SudokuTools
                         case OrganismTypes.Worker:
 
                             // mutate the matrix, pick a random block and pick two random cells and swap them.
-                            int[][] evolving = SudokuTool.EvolveMatrixAsync(problem, Hive[i].Matrix, _rnd);
-                            var evolutionErrors = SudokuTool.Errors(evolving);
+                            int[][] evolving = await Task.FromResult(SudokuTool.EvolveMatrixAsync(problem, Hive[i].Matrix, _rnd));
+                            var evolutionErrors = await Task.FromResult(SudokuTool.Errors(evolving));
 
                             var probability = _rnd.NextDouble();
                             var rareMutation = probability < 0.001;
@@ -185,13 +185,13 @@ namespace SudokuTools
                                 if (rareMutation && !evoWorked)
                                     _stats.mutationFailed++;
 
-                                Hive[i].Matrix = SudokuTool.DuplicateMatrix(evolving); // by value
+                                Hive[i].Matrix = await Task.FromResult(SudokuTool.DuplicateMatrix(evolving)); // by value
                                 Hive[i].Error = evolutionErrors;
 
                                 if (Hive[i].Error < TheBest.Error)
                                 {
                                     TheBest.Error = Hive[i].Error;
-                                    TheBest.Matrix = SudokuTool.DuplicateMatrix(evolving);
+                                    TheBest.Matrix = await Task.FromResult(SudokuTool.DuplicateMatrix(evolving));
                                     _stats.bestMutationsEver++;
                                     // Splash();
                                 }
@@ -206,8 +206,9 @@ namespace SudokuTools
                                     _stats.diedOfOldAge++;
 
                                     // create a new replacement for the hive.
-                                    var m = SudokuTool.GetRandomMatrix(problem, _rnd);
-                                    Hive[i] = new Organism(0, m, SudokuTool.Errors(m), 0);
+                                    var m = await Task.FromResult(SudokuTool.GetRandomMatrix(problem, _rnd));
+                                    var me = await Task.FromResult(SudokuTool.Errors(m));
+                                    Hive[i] = new Organism(0, m, me, 0);
                                     _stats.organismsBorn++;
                                 }
                             }
@@ -219,21 +220,21 @@ namespace SudokuTools
 
 
                 // find the index of the best worker
-                var bestWkrIndex = SudokuTool.GetBestWorkerIndex(Hive, numWorker);
+                var bestWkrIndex = await Task.FromResult(SudokuTool.GetBestWorkerIndex(Hive, numWorker));
                 var bestWorker = Hive[bestWkrIndex];
 
                 // find the index of the best explorer
-                var bestExpIndex = SudokuTool.GetBestExplorerIndex(Hive, numWorker);
+                var bestExpIndex = await Task.FromResult(SudokuTool.GetBestExplorerIndex(Hive, numWorker));
                 var bestExplorer = Hive[bestExpIndex];
 
                 // find the index of the worst worker
-                var worstWkrIndex = SudokuTool.GetWorstWorkerIndex(Hive, numWorker);
+                var worstWkrIndex = await Task.FromResult(SudokuTool.GetWorstWorkerIndex(Hive, numWorker));
 
 
                 // have a  50/50 chance for each block in 2nd organism will be blended into 1st organism 
-                var babyOrg = SudokuTool.MatingResultAsync(bestWorker.Matrix, bestExplorer.Matrix, 0.50, _rnd);
+                var babyOrg = await Task.FromResult(SudokuTool.MatingResult(bestWorker.Matrix, bestExplorer.Matrix, 0.50, _rnd));
                 _stats.matingPairs++;
-                var babyErr = SudokuTool.Errors(babyOrg);
+                var babyErr = await Task.FromResult(SudokuTool.Errors(babyOrg));
                 var genNext = new Organism(OrganismTypes.Worker, babyOrg, babyErr, 0)
                 {
                     // generations are only incremented if one of the parents have a GeneMarker
@@ -248,7 +249,7 @@ namespace SudokuTools
                 if (babyErr < TheBest.Error)
                 {
                     TheBest.Error = babyErr;
-                    TheBest.Matrix = SudokuTool.DuplicateMatrix(babyOrg);
+                    TheBest.Matrix = await Task.FromResult(SudokuTool.DuplicateMatrix(babyOrg));
                     _stats.bestBabies++;
                     // Splash();
                 }
@@ -274,7 +275,7 @@ namespace SudokuTools
         /// <param name="workerOrganism"></param>
         /// <param name="explorerOrganism"></param>
         /// <returns></returns>
-        public static int incrementGeneration(Organism workerOrganism, Organism explorerOrganism)
+        private static int incrementGeneration(Organism workerOrganism, Organism explorerOrganism)
         {
             if ((workerOrganism.GeneMarker != string.Empty || explorerOrganism.GeneMarker != string.Empty))
             {
